@@ -82,8 +82,37 @@ def testCaseMapping (d : UnicodeData) : Bool :=
           && withTitlecasing d.char List.cons == t
             && withUppercasing d.char List.cons == u
               && getLower d.char == String.ofList l
-                && getTitle d.char == String.ofList t
-                  && getUpper d.char == String.ofList u
+                && getLowerString d.char.toString.toSlice == String.ofList l
+                  && getTitle d.char == String.ofList t
+                    && getUpper d.char == String.ofList u
+
+/-- Each character beside a capital sigma: it makes the sigma final, or keeps it
+  from being final, as the `Final_Sigma` context says. -/
+def testFinalSigma (d : UnicodeData) : Bool :=
+  let c := d.char.toString
+  let low := getLowerString c.toSlice
+  let lower (s : String) := getLowerString s.toSlice
+  if d.char == 'Σ' then
+    lower "AΣΣ" == "aσς"
+      && lower "ὈΔΥΣΣΕΎΣ" == "ὀδυσσεύς"
+      && lower "Ο ΟΔΥΣΣΈΑΣ ΒΑΣΙΛΙΆΣ ΤΗΣ ΙΘΆΚΗΣ" == "ο οδυσσέας βασιλιάς της ιθάκης"
+      -- U+0345 is cased and case-ignorable: it is skipped, so alone it makes no sigma final
+      && lower "ͅΣ" == "ͅσ"
+      && lower "ᾼΣ" == "ᾳς"
+      && lower "İΣ" == "i̇ς"
+  else if isCaseIgnorable d.char then
+    -- skipped on both sides
+    lower ("A" ++ c ++ "Σ") == "a" ++ low ++ "ς"
+      && lower ("AΣ" ++ c) == "aς" ++ low
+        && lower ("AΣ" ++ c ++ "B") == "aσ" ++ low ++ "b"
+          && lower (c ++ "Σ") == low ++ "σ"
+  else if isCased d.char then
+    lower (c ++ "Σ") == low ++ "ς"
+      && lower ("AΣ" ++ c) == "aσ" ++ low
+  else
+    lower (c ++ "Σ") == low ++ "σ"
+      && lower ("AΣ" ++ c) == "aς" ++ low
+      && lower ("A" ++ c ++ "Σ") == "a" ++ low ++ "σ"
 
 def testDecompositionMapping (d : UnicodeData) : Bool :=
   d.decomp == getDecompositionMapping? d.char
@@ -169,6 +198,7 @@ def tests : Array (String × (UnicodeData → Bool)) := #[
   ("Case_Mapping", testCaseMapping),
   ("Cased", testCased),
   ("Decomposition_Mapping", testDecompositionMapping),
+  ("Final_Sigma", testFinalSigma),
   ("Default_Ignorable_Code_Point", testDefaultIgnorableCodePoint),
   ("Lowercase", testLowercase),
   ("Math", testMath),

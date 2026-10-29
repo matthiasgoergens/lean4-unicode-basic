@@ -545,6 +545,48 @@ public def withLowercasing (char : Char) (k : Char → List Char → β) : β :=
 public def getLower (char : Char) : String :=
   withLowercasing char fun c l => l.foldl String.push c.toString
 
+/-- Full lowercase mapping of a string
+
+  Maps each character to its full lowercase mapping, as `getLower` does,
+  except that U+03A3 GREEK CAPITAL LETTER SIGMA maps to U+03C2 GREEK SMALL
+  LETTER FINAL SIGMA in the `Final_Sigma` context and to U+03C3 GREEK SMALL
+  LETTER SIGMA otherwise. The context holds when a cased character comes
+  before the sigma and none comes after it, skipping case-ignorable
+  characters on both sides. For example, `"ὈΔΥΣΣΕΎΣ"` maps to `"ὀδυσσεύς"`.
+
+  This is the default lowercase conversion of the Unicode Standard (section
+  3.13). Language-sensitive mappings are not applied.
+
+  Unicode property: `Lowercase_Mapping` -/
+public def getLowerString (s : String.Slice) : String :=
+  loop s.startPos false ""
+where
+  /-- Lowercase from `i` on, appending to `acc`; `cased` tells whether a cased
+    character comes before `i`, skipping case-ignorable characters -/
+  loop (i : s.Pos) (cased : Bool) (acc : String) : String :=
+    if h : i = s.endPos then
+      acc
+    else
+      let c := i.get h
+      let acc :=
+        if c == 'Σ' then
+          acc.push (if cased && !casedFrom (i.next h) then 'ς' else 'σ')
+        else
+          withLowercasing c fun c l => l.foldl String.push (acc.push c)
+      loop (i.next h) (if isCaseIgnorable c then cased else isCased c) acc
+  termination_by i.remainingBytes
+  decreasing_by grind [String.Slice.Pos.lt_iff_remainingBytes_lt, String.Slice.Pos.lt_next]
+  /-- Whether a cased character comes at or after `j`, skipping case-ignorable
+    characters -/
+  casedFrom (j : s.Pos) : Bool :=
+    if h : j = s.endPos then
+      false
+    else
+      let c := j.get h
+      if isCaseIgnorable c then casedFrom (j.next h) else isCased c
+  termination_by j.remainingBytes
+  decreasing_by grind [String.Slice.Pos.lt_iff_remainingBytes_lt, String.Slice.Pos.lt_next]
+
 /-- Map character to uppercase
 
   Returns the character itself if it has no uppercase mapping. This function
